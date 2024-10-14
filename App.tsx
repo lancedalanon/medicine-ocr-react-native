@@ -1,131 +1,110 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import { captureRef } from 'react-native-view-shot';
+import { Camera, CameraType } from 'expo-camera/legacy';
 
 export default function App() {
-  const [facing, setFacing] = useState<CameraType>('back');
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [mediaPermission, setMediaPermission] = useState<boolean | null>(null); // Correct state definition
-  const [isCameraVisible, setIsCameraVisible] = useState(false); // State to toggle camera visibility
-  const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null); // State to store the captured image URI
-  const cameraRef = useRef<CameraView>(null); // Use cameraRef for CameraView
+  const [facing, setFacing] = useState(CameraType.back); // Use proper CameraType
+  const [cameraPermission, setCameraPermission] = useState<boolean | null>(null); // Fix: Correct state setter
+  const [mediaPermission, setMediaPermission] = useState<boolean | null>(null);
+  const [isCameraVisible, setIsCameraVisible] = useState(false);
+  const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
+  const cameraRef = useRef<Camera>(null); // Use Camera instead of CameraView
 
   // Request camera and media permissions
   useEffect(() => {
     (async () => {
-      // Request camera permission
-      const { status: cameraStatus } = await requestCameraPermission();
-      if (cameraStatus === 'granted') {
-        // If camera permission is granted, check for media library permission
-        const { status: mediaStatus } = await MediaLibrary.requestPermissionsAsync();
-        setMediaPermission(mediaStatus === 'granted'); // Use the correct setter function
-      } else {
-        // Handle the case when camera permission is denied
-        alert('Camera permission is required to use this app');
-      }
-    })();
-  }, [requestCameraPermission]);
+      const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
+      setCameraPermission(cameraStatus === 'granted'); // Use the correct setter
 
-  // Check if both permissions are granted
-  if (!cameraPermission || mediaPermission === null) {
-    // Permissions are still loading.
-    return <View />;
+      const { status: mediaStatus } = await MediaLibrary.requestPermissionsAsync();
+      setMediaPermission(mediaStatus === 'granted');
+    })();
+  }, []);
+
+  if (cameraPermission === null || mediaPermission === null) {
+    return <View />; // Loading state
   }
 
-  if (!cameraPermission.granted) {
-    // Camera permissions are not granted yet.
+  if (!cameraPermission) {
     return (
       <View style={styles.container}>
         <Text style={styles.message}>We need your permission to show the camera</Text>
-        <Button onPress={requestCameraPermission} title="Grant Camera Permission" />
+        <Button onPress={() => Camera.requestPermissionsAsync()} title="Grant Camera Permission" />
       </View>
     );
   }
 
   if (!mediaPermission) {
-    // Media Library permissions are not granted yet.
     return (
       <View style={styles.container}>
         <Text style={styles.message}>We need permission to save photos to your library</Text>
-        <Button onPress={async () => {
-          const { status } = await MediaLibrary.requestPermissionsAsync();
-          setMediaPermission(status === 'granted'); // Request media library permissions
-        }} title="Grant Media Library Permission" />
+        <Button
+          onPress={async () => {
+            const { status } = await MediaLibrary.requestPermissionsAsync();
+            setMediaPermission(status === 'granted');
+          }}
+          title="Grant Media Library Permission"
+        />
       </View>
     );
   }
 
-  // Function to toggle the camera facing direction
+  // Toggle the camera facing direction
   function toggleCameraFacing() {
-    setFacing(current => (current === 'back' ? 'front' : 'back'));
+    setFacing(current => (current === CameraType.back ? CameraType.front : CameraType.back));
   }
 
-  // Function to handle the Capture button click
-  function handleCapturePress() {
-    setIsCameraVisible(true); // Show camera view
-  }
-
-  // Function to handle Save button click
-  const handleSavePress = async () => {
+  // Function to capture the photo
+  const handleCapturePress = async () => {
     if (cameraRef.current) {
       try {
-        const localUri = await captureRef(cameraRef, {
-          height: 440,
-          quality: 1,
-        });
-
-        setCapturedImageUri(localUri); // Store the captured image URI for preview
+        const photo = await cameraRef.current.takePictureAsync({ quality: 1, base64: false });
+        setCapturedImageUri(photo.uri); // Store the captured image URI
+        setIsCameraVisible(false); // Hide camera view
       } catch (e) {
-        console.log(e);
-        alert('Error saving image: ' + e.message);
+        console.error(e);
+        alert('Error capturing image: ' + e.message);
       }
     }
-
-    setIsCameraVisible(false);
   };
 
-  // Function to handle Cancel button click
-  function handleCancelPress() {
-    setIsCameraVisible(false); // Close camera view
-  }
-
+  // Show camera view
   return (
     <View style={styles.container}>
       {!isCameraVisible ? (
         <>
-          {capturedImageUri ? (<>
-            <Image
-              source={{ uri: capturedImageUri }}
-              style={styles.previewImage}
-              resizeMode="contain"
-            />
-            <TouchableOpacity style={styles.captureButton} onPress={handleCapturePress}>
-              <Text style={styles.captureText}>Capture</Text>
-            </TouchableOpacity>
-          </>) : (
-            <TouchableOpacity style={styles.captureButton} onPress={handleCapturePress}>
+          {capturedImageUri ? (
+            <>
+              <Image
+                source={{ uri: capturedImageUri }}
+                style={styles.previewImage}
+                resizeMode="contain"
+              />
+              <TouchableOpacity style={styles.captureButton} onPress={() => setIsCameraVisible(true)}>
+                <Text style={styles.captureText}>Retake</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity style={styles.captureButton} onPress={() => setIsCameraVisible(true)}>
               <Text style={styles.captureText}>Capture</Text>
             </TouchableOpacity>
           )}
         </>
       ) : (
-        <View style={styles.cameraContainer}>
-          <CameraView ref={cameraRef} style={styles.camera} facing={facing}>
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
-                <Text style={styles.text}>Flip Camera</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.button} onPress={handleSavePress}>
-                <Text style={styles.text}>Save</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.button} onPress={handleCancelPress}>
-                <Text style={styles.text}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </CameraView>
-        </View>
+        <Camera ref={cameraRef} style={styles.camera} type={facing}>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
+              <Text style={styles.text}>Flip</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={handleCapturePress}>
+              <Text style={styles.text}>Capture</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.button} onPress={() => setIsCameraVisible(false)}>
+              <Text style={styles.text}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </Camera>
       )}
     </View>
   );
@@ -141,23 +120,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingBottom: 10,
   },
-  cameraContainer: {
-    flex: 1,
-    width: '100%', // Full width for camera
-  },
   camera: {
     flex: 1,
+    width: '100%',
   },
   buttonContainer: {
-    position: 'absolute', // Position the button container absolutely
-    bottom: 0, // Align to the bottom
-    left: 0, // Align to the left
-    right: 0, // Align to the right
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-evenly', // Spread out buttons evenly
-    alignItems: 'center',
-    padding: 16, // Add padding around buttons
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Slightly transparent background for better visibility
+    justifyContent: 'space-evenly',
+    padding: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   button: {
     flex: 1,
@@ -166,7 +141,7 @@ const styles = StyleSheet.create({
   captureButton: {
     alignSelf: 'center',
     padding: 20,
-    backgroundColor: 'blue', // Style for capture button
+    backgroundColor: 'blue',
     borderRadius: 10,
     marginTop: 20,
   },
