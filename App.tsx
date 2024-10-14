@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Button, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 import { Camera, CameraType } from 'expo-camera/legacy';
+import MlkitOcr from 'react-native-mlkit-ocr';
+import * as Speech from 'expo-speech';
 
 export default function App() {
   const [facing, setFacing] = useState(CameraType.back); // Use proper CameraType
@@ -9,6 +11,7 @@ export default function App() {
   const [mediaPermission, setMediaPermission] = useState<boolean | null>(null);
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
+  const [ocrResult, setOcrResult] = useState<string | null>(null); // Store OCR result
   const cameraRef = useRef<Camera>(null); // Use Camera instead of CameraView
 
   // Request camera and media permissions
@@ -62,10 +65,19 @@ export default function App() {
         const photo = await cameraRef.current.takePictureAsync({ quality: 1, base64: false });
         setCapturedImageUri(photo.uri); // Store the captured image URI
         setIsCameraVisible(false); // Hide camera view
-      } catch (e) {
+        const resultFromUri = await MlkitOcr.detectFromUri(photo.uri);
+        setOcrResult(resultFromUri[0]?.text || 'No text found'); // Save OCR result
+      } catch (e: any) {
         console.error(e);
         alert('Error capturing image: ' + e.message);
       }
+    }
+  };
+
+  // Function to speak the OCR result
+  const handleSpeakPress = () => {
+    if (ocrResult) {
+      Speech.speak(ocrResult);
     }
   };
 
@@ -76,14 +88,33 @@ export default function App() {
         <>
           {capturedImageUri ? (
             <>
+              {/* Display OCR result in a read-only textarea (TextInput) */}
+              <TextInput
+                style={styles.ocrTextArea}
+                value={ocrResult || ''}
+                multiline
+                placeholder='Please capture an image'
+              />
+              {/* Image preview displayed below the OCR text */}
               <Image
                 source={{ uri: capturedImageUri }}
                 style={styles.previewImage}
                 resizeMode="contain"
               />
-              <TouchableOpacity style={styles.captureButton} onPress={() => setIsCameraVisible(true)}>
-                <Text style={styles.captureText}>Retake</Text>
-              </TouchableOpacity>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={styles.captureButton}
+                  onPress={() => {
+                    setCapturedImageUri(null);
+                    setOcrResult(null);
+                    setIsCameraVisible(true);
+                  }}>
+                  <Text style={styles.recaptureText}>Retake</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.captureButton} onPress={handleSpeakPress}>
+                  <Text style={styles.captureText}>Speak</Text>
+                </TouchableOpacity>
+              </View>
             </>
           ) : (
             <TouchableOpacity style={styles.captureButton} onPress={() => setIsCameraVisible(true)}>
@@ -130,7 +161,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
+    justifyContent: 'center',
     padding: 16,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
@@ -139,21 +170,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   captureButton: {
-    alignSelf: 'center',
     padding: 20,
     backgroundColor: 'blue',
     borderRadius: 10,
-    marginTop: 20,
+    marginHorizontal: 10, // Add margin between buttons
+  },
+  recaptureText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
   },
   captureText: {
     fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
   },
+  buttonRow: {
+    flexDirection: 'row', // Row layout for the buttons
+    justifyContent: 'center',
+    width: '100%',
+    marginTop: 20,
+  },
   previewImage: {
     width: '100%',
-    height: 400,
+    height: 200,
     borderRadius: 10,
+    marginVertical: 10,
+  },
+  ocrTextArea: {
+    width: '100%',
+    height: 300,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    borderRadius: 10,
+    textAlignVertical: 'top',
+    backgroundColor: '#f9f9f9',
+    marginBottom: 10,
+    fontSize: 32,
   },
   text: {
     fontSize: 18,
