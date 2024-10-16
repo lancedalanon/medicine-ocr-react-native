@@ -24,7 +24,15 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.lancedalanon.medicineocrreactnative"
+      "package": "com.lancedalanon.medicineocrreactnative",
+      "manifest": {
+        "meta-data": [
+          {
+            "android:name": "com.google.firebase.ml.vision.DEPENDENCIES",
+            "android:value": "ocr"
+          }
+        ]
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
