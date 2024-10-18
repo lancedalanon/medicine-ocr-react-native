@@ -1,24 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Button, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 import { Camera, CameraType } from 'expo-camera/legacy';
-import MlkitOcr from 'react-native-mlkit-ocr';
 import * as Speech from 'expo-speech';
+import { API_URL, API_KEY } from '@env'; 
 
 export default function App() {
-  const [facing, setFacing] = useState(CameraType.back); // Use proper CameraType
-  const [cameraPermission, setCameraPermission] = useState<boolean | null>(null); // Fix: Correct state setter
+  const [facing, setFacing] = useState(CameraType.back);
+  const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
   const [mediaPermission, setMediaPermission] = useState<boolean | null>(null);
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
-  const [ocrResult, setOcrResult] = useState<string | null>(null); // Store OCR result
-  const cameraRef = useRef<Camera>(null); // Use Camera instead of CameraView
+  const [ocrResult, setOcrResult] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false); // Loading state
+  const cameraRef = useRef<Camera>(null);
 
   // Request camera and media permissions
   useEffect(() => {
     (async () => {
       const { status: cameraStatus } = await Camera.requestCameraPermissionsAsync();
-      setCameraPermission(cameraStatus === 'granted'); // Use the correct setter
+      setCameraPermission(cameraStatus === 'granted');
 
       const { status: mediaStatus } = await MediaLibrary.requestPermissionsAsync();
       setMediaPermission(mediaStatus === 'granted');
@@ -61,15 +62,38 @@ export default function App() {
   // Function to capture the photo
   const handleCapturePress = async () => {
     if (cameraRef.current) {
+      setIsLoading(true); // Start loading
       try {
         const photo = await cameraRef.current.takePictureAsync({ quality: 1, base64: false });
-        setCapturedImageUri(photo.uri); // Store the captured image URI
+        setCapturedImageUri(photo.uri);
         setIsCameraVisible(false); // Hide camera view
-        const resultFromUri = await MlkitOcr.detectFromUri(photo.uri);
-        setOcrResult(resultFromUri[0]?.text || 'No text found'); // Save OCR result
+
+        // Fetch the image as a Blob
+        const response = await fetch(photo.uri);
+        const blob = await response.blob();
+
+        // Prepare data for API request
+        const bodyData = new FormData();
+        bodyData.append('file', blob, 'photo.jpg'); // Attach the image blob
+
+        // Make the API call
+        const apiResponse = await fetch(`${API_URL}/process-image`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'X-API-KEY': API_KEY, // Use X-API-KEY header for authentication
+          },
+          body: bodyData,
+        });
+
+        // Parse the response and set the OCR result
+        const result = await apiResponse.json();
+        setOcrResult(result.text || 'No text found');
       } catch (e: any) {
         console.error(e);
-        alert('Error capturing image: ' + e.message);
+        Alert.alert('Error capturing image', e.message);
+      } finally {
+        setIsLoading(false); // End loading
       }
     }
   };
@@ -81,21 +105,18 @@ export default function App() {
     }
   };
 
-  // Show camera view
   return (
     <View style={styles.container}>
       {!isCameraVisible ? (
         <>
           {capturedImageUri ? (
             <>
-              {/* Display OCR result in a read-only textarea (TextInput) */}
               <TextInput
                 style={styles.ocrTextArea}
                 value={ocrResult || ''}
                 multiline
                 placeholder='Please capture an image'
               />
-              {/* Image preview displayed below the OCR text */}
               <Image
                 source={{ uri: capturedImageUri }}
                 style={styles.previewImage}
@@ -108,7 +129,9 @@ export default function App() {
                     setCapturedImageUri(null);
                     setOcrResult(null);
                     setIsCameraVisible(true);
-                  }}>
+                  }}
+                  disabled={isLoading} // Disable button while loading
+                >
                   <Text style={styles.recaptureText}>Retake</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.captureButton} onPress={handleSpeakPress}>
@@ -128,8 +151,9 @@ export default function App() {
             <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
               <Text style={styles.text}>Flip</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.button} onPress={handleCapturePress}>
-              <Text style={styles.text}>Capture</Text>
+            <TouchableOpacity style={styles.button} onPress={handleCapturePress} disabled={isLoading}>
+              {/* Display a loading indicator while capturing */}
+              {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.text}>Capture</Text>}
             </TouchableOpacity>
             <TouchableOpacity style={styles.button} onPress={() => setIsCameraVisible(false)}>
               <Text style={styles.text}>Cancel</Text>
@@ -173,7 +197,7 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: 'blue',
     borderRadius: 10,
-    marginHorizontal: 10, // Add margin between buttons
+    marginHorizontal: 10,
   },
   recaptureText: {
     fontSize: 24,
@@ -186,7 +210,7 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   buttonRow: {
-    flexDirection: 'row', // Row layout for the buttons
+    flexDirection: 'row',
     justifyContent: 'center',
     width: '100%',
     marginTop: 20,
