@@ -20,7 +20,8 @@
     "react-native": "0.74.5",
     "react-native-dotenv": "^3.4.11",
     "react-native-mlkit-ocr": "^0.3.0",
-    "react-native-view-shot": "3.8.0"
+    "react-native-view-shot": "3.8.0",
+    "expo-build-properties": "~0.12.5"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

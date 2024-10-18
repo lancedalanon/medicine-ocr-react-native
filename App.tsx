@@ -74,7 +74,7 @@ export default function App() {
 
         // Prepare data for API request
         const bodyData = new FormData();
-        bodyData.append('file', blob, 'photo.jpg'); // Attach the image blob
+        bodyData.append('image', blob, 'photo.jpg'); // Attach the image blob
 
         // Make the API call
         const apiResponse = await fetch(`${API_URL}/process-image`, {

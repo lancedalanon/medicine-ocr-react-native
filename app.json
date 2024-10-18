@@ -25,14 +25,6 @@
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.lancedalanon.medicineocrreactnative",
-      "manifest": {
-        "meta-data": [
-          {
-            "android:name": "com.google.firebase.ml.vision.DEPENDENCIES",
-            "android:value": "ocr"
-          }
-        ]
-      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -45,8 +37,16 @@
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone",
           "recordAudioAndroid": true
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
       ]
-    ],
+    ], 
     "extra": {
       "eas": {
         "projectId": "7febec32-c259-49b9-96b4-aada7399b649"
