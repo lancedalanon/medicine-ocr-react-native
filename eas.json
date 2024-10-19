@@ -8,7 +8,6 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "API_URL": "https://127.0.0.1:5000",
         "API_KEY": "07e481a6beeb97ef7b816283338649ca7324d92b084b208553e05cf03d5779ab"
       }
     },
@@ -18,7 +17,6 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "API_URL": "https://127.0.0.1:5000",
         "API_KEY": "07e481a6beeb97ef7b816283338649ca7324d92b084b208553e05cf03d5779ab"
       }
     }

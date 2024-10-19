@@ -22,9 +22,18 @@
       },
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.usesCleartextTraffic"
       ],
       "package": "com.lancedalanon.medicineocrreactnative",
+      "config": {
+        "usesLibrary": [
+          {
+            "name": "org.apache.http.legacy",
+            "required": false
+          }
+        ]
+      },
     },
     "web": {
       "favicon": "./assets/favicon.png"

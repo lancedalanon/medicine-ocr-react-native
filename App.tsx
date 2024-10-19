@@ -3,7 +3,43 @@ import { ActivityIndicator, Button, Image, StyleSheet, Text, TextInput, Touchabl
 import * as MediaLibrary from 'expo-media-library';
 import { Camera, CameraType } from 'expo-camera/legacy';
 import * as Speech from 'expo-speech';
-import { API_URL, API_KEY } from '@env'; 
+import { API_KEY } from '@env'; 
+
+/**
+ * Function to send an XML HTTP request to a server with the provided data.
+ * The request includes an 'X-API-KEY' header for authentication using the API_KEY.
+ * 
+ * @param {Object} data - The data to be sent with the request (e.g., form data or JSON).
+ * @returns {Promise<Object>} - A promise that resolves with the server's response or rejects with an error.
+ */
+function sendXmlHttpRequest(data) {
+  const xhr = new XMLHttpRequest();  // Create a new XMLHttpRequest object
+
+  return new Promise((resolve, reject) => {
+    // Define the behavior when the state of the request changes
+    xhr.onreadystatechange = e => {
+      if (xhr.readyState !== 4) {
+        return;  // Wait until the request is complete
+      }
+
+      // If the request is successful (HTTP status 200), resolve the promise
+      if (xhr.status === 200) {
+        resolve(JSON.parse(xhr.responseText));  // Parse and return the response JSON
+      } else {
+        reject("Request Failed");  // Reject with an error message if the request fails
+      }
+    };
+
+    // Open a POST request to the server endpoint
+    xhr.open("POST", "http://192.168.68.106:5000/process-image");
+
+    // Set the 'X-API-KEY' header with the API key value
+    xhr.setRequestHeader("X-API-KEY", API_KEY);
+
+    // Send the request with the provided data
+    xhr.send(data);
+  });
+}
 
 export default function App() {
   const [facing, setFacing] = useState(CameraType.back);
@@ -59,36 +95,25 @@ export default function App() {
     setFacing(current => (current === CameraType.back ? CameraType.front : CameraType.back));
   }
 
-  // Function to capture the photo
   const handleCapturePress = async () => {
     if (cameraRef.current) {
       setIsLoading(true); // Start loading
       try {
+        // Capture the photo
         const photo = await cameraRef.current.takePictureAsync({ quality: 1, base64: false });
         setCapturedImageUri(photo.uri);
         setIsCameraVisible(false); // Hide camera view
-
-        // Fetch the image as a Blob
-        const response = await fetch(photo.uri);
-        const blob = await response.blob();
-
-        // Prepare data for API request
-        const bodyData = new FormData();
-        bodyData.append('image', blob, 'photo.jpg'); // Attach the image blob
-
-        // Make the API call
-        const apiResponse = await fetch(`${API_URL}/process-image`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'X-API-KEY': API_KEY, // Use X-API-KEY header for authentication
-          },
-          body: bodyData,
+  
+        const photoData = new FormData();
+        photoData.append("image", {
+          uri: photo.uri, // Use the URI of the captured photo
+          name: 'captured_photo.jpg', // You can set a dynamic filename here
+          type: 'image/jpeg' // Make sure this matches the actual image type
         });
-
-        // Parse the response and set the OCR result
-        const result = await apiResponse.json();
-        setOcrResult(result.text || 'No text found');
+  
+        // Send the photo data to the server
+        const ocrResponse = await sendXmlHttpRequest(photoData);
+        setOcrResult(ocrResponse.data || 'No text found');
       } catch (e: any) {
         console.error(e);
         Alert.alert('Error capturing image', e.message);
@@ -96,7 +121,7 @@ export default function App() {
         setIsLoading(false); // End loading
       }
     }
-  };
+  };  
 
   // Function to speak the OCR result
   const handleSpeakPress = () => {
@@ -130,9 +155,13 @@ export default function App() {
                     setOcrResult(null);
                     setIsCameraVisible(true);
                   }}
-                  disabled={isLoading} // Disable button while loading
+                  disabled={isLoading} // Disable the button while loading
                 >
-                  <Text style={styles.recaptureText}>Retake</Text>
+                  {isLoading ? ( // Check if loading to render spinner
+                    <ActivityIndicator size="large" color="#fff" /> // Customize size and color as needed
+                  ) : (
+                    <Text style={styles.recaptureText}>Retake</Text>
+                  )}
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.captureButton} onPress={handleSpeakPress}>
                   <Text style={styles.captureText}>Speak</Text>
@@ -152,8 +181,7 @@ export default function App() {
               <Text style={styles.text}>Flip</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.button} onPress={handleCapturePress} disabled={isLoading}>
-              {/* Display a loading indicator while capturing */}
-              {isLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.text}>Capture</Text>}
+              <Text style={styles.text}>Capture</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.button} onPress={() => setIsCameraVisible(false)}>
               <Text style={styles.text}>Cancel</Text>
