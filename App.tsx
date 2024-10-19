@@ -1,45 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Button, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
+import { Platform, ActivityIndicator, Button, Image, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert, SafeAreaView, Modal } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 import { Camera, CameraType } from 'expo-camera/legacy';
 import * as Speech from 'expo-speech';
 import { API_KEY } from '@env'; 
-
-/**
- * Function to send an XML HTTP request to a server with the provided data.
- * The request includes an 'X-API-KEY' header for authentication using the API_KEY.
- * 
- * @param {Object} data - The data to be sent with the request (e.g., form data or JSON).
- * @returns {Promise<Object>} - A promise that resolves with the server's response or rejects with an error.
- */
-function sendXmlHttpRequest(data) {
-  const xhr = new XMLHttpRequest();  // Create a new XMLHttpRequest object
-
-  return new Promise((resolve, reject) => {
-    // Define the behavior when the state of the request changes
-    xhr.onreadystatechange = e => {
-      if (xhr.readyState !== 4) {
-        return;  // Wait until the request is complete
-      }
-
-      // If the request is successful (HTTP status 200), resolve the promise
-      if (xhr.status === 200) {
-        resolve(JSON.parse(xhr.responseText));  // Parse and return the response JSON
-      } else {
-        reject("Request Failed");  // Reject with an error message if the request fails
-      }
-    };
-
-    // Open a POST request to the server endpoint
-    xhr.open("POST", "http://192.168.68.106:5000/process-image");
-
-    // Set the 'X-API-KEY' header with the API key value
-    xhr.setRequestHeader("X-API-KEY", API_KEY);
-
-    // Send the request with the provided data
-    xhr.send(data);
-  });
-}
+import { Ionicons } from '@expo/vector-icons';
 
 export default function App() {
   const [facing, setFacing] = useState(CameraType.back);
@@ -48,8 +13,40 @@ export default function App() {
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
   const [ocrResult, setOcrResult] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false); // Loading state
+  const [isLoading, setIsLoading] = useState(false); 
+  const [modalVisible, setModalVisible] = useState(false);
+  const [ipAddress, setIpAddress] = useState('192.168.68.106');
+  const [inputIpAddress, setInputIpAddress] = useState(ipAddress);
   const cameraRef = useRef<Camera>(null);
+
+  function sendXmlHttpRequest(data) {
+    const xhr = new XMLHttpRequest();  // Create a new XMLHttpRequest object
+  
+    return new Promise((resolve, reject) => {
+      // Define the behavior when the state of the request changes
+      xhr.onreadystatechange = e => {
+        if (xhr.readyState !== 4) {
+          return;  // Wait until the request is complete
+        }
+  
+        // If the request is successful (HTTP status 200), resolve the promise
+        if (xhr.status === 200) {
+          resolve(JSON.parse(xhr.responseText));  // Parse and return the response JSON
+        } else {
+          reject("Request Failed");  // Reject with an error message if the request fails
+        }
+      };
+  
+      // Open a POST request to the server endpoint
+      xhr.open("POST", `http://${ipAddress}:5000/process-image`);
+  
+      // Set the 'X-API-KEY' header with the API key value
+      xhr.setRequestHeader("X-API-KEY", API_KEY);
+  
+      // Send the request with the provided data
+      xhr.send(data);
+    });
+  }
 
   // Request camera and media permissions
   useEffect(() => {
@@ -123,6 +120,12 @@ export default function App() {
     }
   };  
 
+  // Function to handle the submission of the IP address form
+  const handleSubmitIpAddress = () => {
+    setIpAddress(inputIpAddress); // Update the state with the new IP address
+    setModalVisible(false); // Close the modal
+  };
+
   // Function to speak the OCR result
   const handleSpeakPress = () => {
     if (ocrResult) {
@@ -131,77 +134,112 @@ export default function App() {
   };
 
   return (
-    <View style={styles.container}>
-      {!isCameraVisible ? (
-        <>
-          {capturedImageUri ? (
-            <>
-              <TextInput
-                style={styles.ocrTextArea}
-                value={ocrResult || ''}
-                multiline
-                placeholder='Please capture an image'
-              />
-              <Image
-                source={{ uri: capturedImageUri }}
-                style={styles.previewImage}
-                resizeMode="contain"
-              />
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={styles.captureButton}
-                  onPress={() => {
-                    setCapturedImageUri(null);
-                    setOcrResult(null);
-                    setIsCameraVisible(true);
-                  }}
-                  disabled={isLoading} // Disable the button while loading
-                >
-                  {isLoading ? ( // Check if loading to render spinner
-                    <ActivityIndicator size="large" color="#fff" /> // Customize size and color as needed
-                  ) : (
-                    <Text style={styles.recaptureText}>Retake</Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.captureButton} onPress={handleSpeakPress}>
-                  <Text style={styles.captureText}>Speak</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          ) : (
-            <TouchableOpacity style={styles.captureButton} onPress={() => setIsCameraVisible(true)}>
-              <Text style={styles.captureText}>Capture</Text>
-            </TouchableOpacity>
-          )}
-        </>
-      ) : (
-        <Camera ref={cameraRef} style={styles.camera} type={facing}>
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
-              <Text style={styles.text}>Flip</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.button} onPress={handleCapturePress} disabled={isLoading}>
-              <Text style={styles.text}>Capture</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.button} onPress={() => setIsCameraVisible(false)}>
-              <Text style={styles.text}>Cancel</Text>
-            </TouchableOpacity>
+    <SafeAreaView style={{ flex: 1, marginTop: Platform.OS === 'android' ? 30 : 0 }}>
+      {/* Settings gear icon */}
+      <TouchableOpacity 
+        style={styles.gearIcon} 
+        onPress={() => setModalVisible(true)}
+      >
+        <Ionicons name="settings" size={32} color="black" />
+      </TouchableOpacity>
+      
+      <View style={styles.container}>
+        {!isCameraVisible ? (
+          <>
+            {capturedImageUri ? (
+              <>
+                <TextInput
+                  style={styles.ocrTextArea}
+                  value={ocrResult || ''}
+                  multiline
+                  placeholder="Please capture an image"
+                />
+                <Image
+                  source={{ uri: capturedImageUri }}
+                  style={styles.previewImage}
+                  resizeMode="contain"
+                />
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
+                    style={styles.captureButton}
+                    onPress={() => {
+                      setCapturedImageUri(null);
+                      setOcrResult(null);
+                      setIsCameraVisible(true);
+                    }}
+                    disabled={isLoading} // Disable the button while loading
+                  >
+                    {isLoading ? ( // Check if loading to render spinner
+                      <ActivityIndicator size="large" color="#fff" /> // Customize size and color as needed
+                    ) : (
+                      <Text style={styles.recaptureText}>Retake</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.captureButton} onPress={handleSpeakPress}>
+                    <Text style={styles.captureText}>Speak</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <TouchableOpacity style={styles.captureButton} onPress={() => setIsCameraVisible(true)}>
+                <Text style={styles.captureText}>Capture</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        ) : (
+          <Camera ref={cameraRef} style={styles.camera} type={facing}>
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity style={styles.button} onPress={toggleCameraFacing}>
+                <Text style={styles.text}>Flip</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.button} onPress={handleCapturePress} disabled={isLoading}>
+                <Text style={styles.text}>Capture</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.button} onPress={() => setIsCameraVisible(false)}>
+                <Text style={styles.text}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </Camera>
+        )}
+      </View>
+
+      {/* Modal for IP Address Form */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalView}>
+          <Text style={styles.modalText}>Enter Server IP Address</Text>
+          <TextInput
+            style={styles.ipInput}
+            value={inputIpAddress}
+            onChangeText={setInputIpAddress}
+            placeholder="Enter IP address"
+            keyboardType="numeric"
+          />
+          <View style={styles.modalButtonContainer}>
+            <Button title="Submit" onPress={handleSubmitIpAddress} />
+            <Button title="Cancel" onPress={() => setModalVisible(false)} color="red" />
           </View>
-        </Camera>
-      )}
-    </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'center', 
+    alignItems: 'center',     
   },
-  message: {
-    textAlign: 'center',
-    paddingBottom: 10,
+  gearIcon: {
+    position: 'absolute',   
+    top: 10,                
+    left: 10,              
+    zIndex: 1,             
   },
   camera: {
     flex: 1,
@@ -265,5 +303,31 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: 'white',
+  },
+  modalView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'grey',
+  },
+  modalText: {
+    fontSize: 18,
+    marginBottom: 20,
+    color: '#fff',
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '80%', 
+    marginTop: 20, 
+  },
+  ipInput: {
+    width: 250,
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    marginBottom: 20,
+    paddingHorizontal: 10,
+    backgroundColor: '#fff',
   },
 });
