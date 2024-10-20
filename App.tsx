@@ -134,7 +134,7 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, marginTop: Platform.OS === 'android' ? 30 : 0 }}>
+    <SafeAreaView style={{ flex: 1 }}>
       {/* Settings gear icon */}
       <TouchableOpacity 
         style={styles.gearIcon} 
@@ -239,7 +239,8 @@ const styles = StyleSheet.create({
     position: 'absolute',   
     top: 10,                
     left: 10,              
-    zIndex: 1,             
+    zIndex: 1,  
+    marginBottom: 20,            
   },
   camera: {
     flex: 1,
