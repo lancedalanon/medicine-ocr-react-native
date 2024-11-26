@@ -3,7 +3,6 @@ import { Platform, ActivityIndicator, Button, Image, StyleSheet, Text, TextInput
 import * as MediaLibrary from 'expo-media-library';
 import { Camera, CameraType } from 'expo-camera/legacy';
 import * as Speech from 'expo-speech';
-import { API_KEY } from '@env'; 
 import { Ionicons } from '@expo/vector-icons';
 
 export default function App() {
@@ -39,9 +38,6 @@ export default function App() {
   
       // Open a POST request to the server endpoint
       xhr.open("POST", `http://${ipAddress}:5000/process-image`);
-  
-      // Set the 'X-API-KEY' header with the API key value
-      xhr.setRequestHeader("X-API-KEY", API_KEY);
   
       // Send the request with the provided data
       xhr.send(data);
